@@ -1,0 +1,31 @@
+// routes/products.js
+// Defines RESTful routes for the products resource
+
+const express = require('express');
+const router = express.Router();
+
+const productsController = require('../controllers/productsController');
+const auth = require('../middleware/auth');
+const { validateProduct } = require('../middleware/validate');
+const asyncWrapper = require('../middleware/asyncWrapper');
+
+// Routes:
+// GET /api/products                -> list (with filter, pagination)
+// GET /api/products/:id            -> get by id
+// POST /api/products               -> create (protected by API key)
+// PUT /api/products/:id            -> update (protected)
+// DELETE /api/products/:id         -> delete (protected)
+// GET /api/products/search?q=term  -> search by name
+// GET /api/products/stats          -> statistics (count by category)
+
+router.get('/', asyncWrapper(productsController.listProducts));
+router.get('/search', asyncWrapper(productsController.searchProducts));
+router.get('/stats', asyncWrapper(productsController.productsStats));
+router.get('/:id', asyncWrapper(productsController.getProductById));
+
+// Protect create/update/delete with API key auth middleware
+router.post('/', auth.requireApiKey, validateProduct('create'), asyncWrapper(productsController.createProduct));
+router.put('/:id', auth.requireApiKey, validateProduct('update'), asyncWrapper(productsController.updateProduct));
+router.delete('/:id', auth.requireApiKey, asyncWrapper(productsController.deleteProduct));
+
+module.exports = router;

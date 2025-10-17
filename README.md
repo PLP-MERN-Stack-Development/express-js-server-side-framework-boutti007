@@ -1,62 +1,214 @@
-# Express.js RESTful API Assignment
+````markdown name=README.md
+# Express Products API
 
-This assignment focuses on building a RESTful API using Express.js, implementing proper routing, middleware, and error handling.
+A RESTful API built with Express.js for managing a simple `products` resource. This project implements standard CRUD operations, middleware (logging, authentication, validation), global error handling, and advanced features such as filtering, pagination, search, and basic statistics. The API uses an in-memory datastore for ease of grading; you can swap it for a real database (MongoDB, Postgres) if needed.
 
-## Assignment Overview
+---
 
-You will:
-1. Set up an Express.js server
-2. Create RESTful API routes for a product resource
-3. Implement custom middleware for logging, authentication, and validation
-4. Add comprehensive error handling
-5. Develop advanced features like filtering, pagination, and search
+## Table of Contents
+- Project structure
+- Requirements
+- Installation
+- Environment variables
+- Running the server
+- API Endpoints
+- Middleware & Error Handling
+- Examples (curl)
+- Notes for submission
 
-## Getting Started
+---
 
-1. Accept the GitHub Classroom assignment invitation
-2. Clone your personal repository that was created by GitHub Classroom
-3. Install dependencies:
-   ```
-   npm install
-   ```
-4. Run the server:
-   ```
-   npm start
-   ```
+## Project structure (important files)
+- `server.js` — app entry point
+- `routes/products.js` — RESTful routes for products
+- `controllers/productsController.js` — controller logic and in-memory datastore
+- `middleware/logger.js` — request logging middleware
+- `middleware/auth.js` — API key authentication middleware
+- `middleware/validate.js` — validation middleware for create/update
+- `middleware/asyncWrapper.js` — helper to catch async errors
+- `errors/errors.js` — custom error classes and global error handler
+- `.env.example` — example environment variables you must provide
+- `package.json` — dependencies and start scripts
 
-## Files Included
-
-- `Week2-Assignment.md`: Detailed assignment instructions
-- `server.js`: Starter Express.js server file
-- `.env.example`: Example environment variables file
+---
 
 ## Requirements
+- Node.js v18+ (or v16+)
+- npm
 
-- Node.js (v18 or higher)
-- npm or yarn
-- Postman, Insomnia, or curl for API testing
+Recommended installations for converting/creating screenshots (if needed):
+- ImageMagick or Inkscape (optional)
+
+---
+
+## Installation
+1. Clone the repository:
+   git clone <your-repo-url>
+   cd <repo-folder>
+
+2. Install dependencies:
+   npm install
+
+3. Copy environment example:
+   cp .env.example .env
+   Then edit `.env` to set `API_KEY` (optional) and `PORT` if you want a different port.
+
+---
+
+## Environment variables
+Use `.env` (do not commit secrets). Example variables in `.env.example`:
+- `PORT` — port number (default 3000)
+- `API_KEY` — if set, protected endpoints require this value in the `x-api-key` header; if empty, create/update/delete are open for local development.
+
+---
+
+## Run
+Start server:
+npm start
+
+Development (with nodemon if installed):
+npm run dev
+
+Default server URL:
+http://localhost:3000
+
+Root endpoint:
+GET / → returns "Hello World from Express Products API"
+
+---
 
 ## API Endpoints
 
-The API will have the following endpoints:
+Base path: `/api/products`
 
-- `GET /api/products`: Get all products
-- `GET /api/products/:id`: Get a specific product
-- `POST /api/products`: Create a new product
-- `PUT /api/products/:id`: Update a product
-- `DELETE /api/products/:id`: Delete a product
+1. GET /api/products  
+   - List products with filtering and pagination.
+   - Query params:
+     - `category` — filter by category (case-insensitive exact match)
+     - `page` — page number (default: 1)
+     - `limit` — items per page (default: 10)
+     - `minPrice` / `maxPrice` — numeric price filters
+   - Response:
+     ```json
+     {
+       "total": 12,
+       "page": 1,
+       "limit": 10,
+       "data": [ /* product objects */ ]
+     }
+     ```
 
-## Submission
+2. GET /api/products/:id  
+   - Get a single product by `id`.
+   - 404 if not found.
 
-Your work will be automatically submitted when you push to your GitHub Classroom repository. Make sure to:
+3. POST /api/products  
+   - Create a new product (protected if `API_KEY` set).
+   - Body (JSON, all fields required):
+     ```json
+     {
+       "name": "Product Name",
+       "description": "Description",
+       "price": 12.5,
+       "category": "electronics",
+       "inStock": true
+     }
+     ```
+   - Returns 201 with the created product.
 
-1. Complete all the required API endpoints
-2. Implement the middleware and error handling
-3. Document your API in the README.md
-4. Include examples of requests and responses
+4. PUT /api/products/:id  
+   - Update an existing product (protected if `API_KEY` set).
+   - Accepts partial updates; validated for type correctness.
+   - Returns updated product.
 
-## Resources
+5. DELETE /api/products/:id  
+   - Delete a product (protected if `API_KEY` set).
+   - Returns deleted product details.
 
-- [Express.js Documentation](https://expressjs.com/)
-- [RESTful API Design Best Practices](https://restfulapi.net/)
-- [HTTP Status Codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status) 
+6. GET /api/products/search?q=term  
+   - Search products by `name` (case-insensitive substring).
+   - Returns `{ total, data }`.
+
+7. GET /api/products/stats  
+   - Returns product counts grouped by category:
+     ```json
+     {
+       "stats": { "electronics": 3, "stationery": 2 },
+       "totalProducts": 5
+     }
+     ```
+
+---
+
+## Middleware & Validation
+- Logger middleware logs method, URL, and timestamp for each request.
+- JSON body parsing via `body-parser`.
+- Authentication middleware checks `x-api-key` header against `API_KEY` (if configured).
+- Validation middleware enforces required fields and types for create and update routes; returns 400 `ValidationError` when invalid.
+- Async route handlers are wrapped to forward thrown errors to global error handler.
+
+---
+
+## Error handling
+- Uses custom error classes in `errors/errors.js`:
+  - `NotFoundError` -> 404
+  - `ValidationError` -> 400
+  - `UnauthorizedError` -> 401
+  - Generic `AppError` -> custom status or 500
+- Global error-handler middleware returns JSON:
+  ```json
+  {
+    "error": { "message": "Description", "status": <http-status> }
+  }
+  ```
+
+---
+
+## Examples (curl)
+
+List products (first page):
+curl "http://localhost:3000/api/products?page=1&limit=5"
+
+Filter by category:
+curl "http://localhost:3000/api/products?category=electronics"
+
+Create product (with API key):
+curl -X POST http://localhost:3000/api/products \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: YOUR_KEY" \
+  -d '{"name":"New","description":"desc","price":10,"category":"misc","inStock":true}'
+
+Search:
+curl "http://localhost:3000/api/products/search?q=mouse"
+
+Get stats:
+curl "http://localhost:3000/api/products/stats"
+
+---
+
+## Data persistence
+This project uses an in-memory array as the data store (located in `controllers/productsController.js`). For real persistence:
+- Replace the data array with a database layer (e.g., MongoDB with Mongoose, PostgreSQL).
+- Move DB logic into a separate service/data-access module for separation of concerns.
+
+---
+
+## Submission checklist
+When submitting to GitHub Classroom or your repo, include:
+- All project files (server.js, routes/, controllers/, middleware/, errors/)
+- `README.md` (this file)
+- `.env.example` (do not commit `.env` with secrets)
+- `screenshot.png` (a screenshot of MongoDB Compass or Atlas showing the required data — if your assignment requires one)
+- Optionally: `.gitignore` (exclude node_modules)
+
+---
+
+## Notes & tips
+- If `API_KEY` is left blank in `.env`, protected endpoints will be open for local development and grading convenience.
+- Replace the in-memory store with a DB for production or when required by the assignment.
+- Use tools like Postman or Insomnia to exercise the API during grading.
+
+---
+
+If you want, I can also generate a `.gitignore`, `.env.example` (if missing), or a short script of PowerShell commands to initialize the repo on Windows and push these files to GitHub.  
+````
